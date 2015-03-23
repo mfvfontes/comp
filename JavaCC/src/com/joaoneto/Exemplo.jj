@@ -1,0 +1,15 @@
+PARSER_BEGIN(Exemplo)
+
+public class Exemplo {
+ public static void main(String args[]) throws ParseException {
+  Exemplo parser = new Exemplo(System.in);
+  parser.Aritm();
+ }
+}
+
+PARSER_END(Exemplo)
+
+SKIP :
+{
+" " | "\t" | "\r"
+}
