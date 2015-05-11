@@ -5,9 +5,11 @@ options {
     tokenVocab = jJQueryLexer;
 }
 
-start : (JAVA | jQueryBlock)+ EOF;
+start : (java | jQueryBlock)+ EOF;
 
-jQueryBlock : OPENTAG (in | out | expr)* CLOSETAG;
+java : (JAVA | COMMENT_OUTSIDE)+ ;
+
+jQueryBlock : OPENTAG (in | out | expr | COMMENT_INSIDE)* CLOSETAG;
 
 in : IN ID SEMICOLON;
 out : OUT ID SEMICOLON;

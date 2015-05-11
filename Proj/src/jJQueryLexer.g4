@@ -2,12 +2,12 @@ lexer grammar jJQueryLexer;
 
 OPENTAG : '/*@jQ'      -> mode(JQUERY);
 
-JAVA : ~'/'+            -> channel(HIDDEN);
+JAVA : ~'/'+;
 
 COMMENT_OUTSIDE
    :   ( '//' ~[\r\n]* '\r'? '\n'
        | '/*' ~'@' .*? '*/'
-       ) -> skip
+       )
     ;
 
 mode JQUERY ;
@@ -54,8 +54,8 @@ ID: ('A'..'Z' | 'a'..'z' | '0'..'9')+;
 COMMENT_INSIDE
    :   ( '//' ~[\r\n]* '\r'? '\n'
        | '/*' ~'@' .*? '*/'
-       ) -> skip
+       )
     ;
 
 WS: (' ' | '\t')+ -> channel(HIDDEN);
-NL: ('\n')+ -> channel(HIDDEN);
+NL: ('\n' | '\r\n')+ -> channel(HIDDEN);
