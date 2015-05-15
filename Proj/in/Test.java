@@ -14,13 +14,18 @@ public class Test {
         selectFrom.add(4);
 
         ArrayList<Object> selectTo = new ArrayList<Object>();
-        int a = 1;
+        int a[] , b;
 
         /*@jQ
         in selectFrom;
+        in a;
+
+        in b;
+        in c;
+
         out selectTo;
 
-        selectTo = $("selectFrom:not(.Integer),:gt(2)");
+        selectTo = $("selectFrom:not(.Integer)|:gt(2)");
 
          */
 

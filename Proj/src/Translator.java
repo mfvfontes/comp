@@ -1,3 +1,4 @@
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.antlr.v4.runtime.tree.ErrorNode;
@@ -6,6 +7,8 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Created by João on 11/05/2015.
@@ -13,7 +16,8 @@ import java.util.HashMap;
 public class Translator extends jJQueryParserBaseListener {
 
     ANTLRErrorListener strategy;
-    HashMap<String, String> vars = new HashMap<String, String>();
+    HashMap<String, Boolean> vars = new HashMap<String, Boolean>();
+    HashMap<String, String> colTypes = new HashMap<String, String>();
 
     // Where to print to
     private PrintStream out;
@@ -50,21 +54,38 @@ public class Translator extends jJQueryParserBaseListener {
     public void enterLocalVariableDeclaration(jJQueryParser.LocalVariableDeclarationContext ctx) {
 
         String type = ctx.type().getText();
-        //System.out.println(ctx.type().getText());
+
         for (int i = 0; i < ctx.variableDeclarators().variableDeclarator().size(); i++) {
-            String identifier = ctx.variableDeclarators().variableDeclarator(i).variableDeclaratorId().Identifier().getText();
-            //System.out.println(ctx.variableDeclarators().variableDeclarator(i).variableDeclaratorId().Identifier().getText());
+            String identifier = ctx.variableDeclarators().variableDeclarator(i).variableDeclaratorId().getText();
 
-            vars.put(identifier,type);
+            if (identifier.matches("\\w+\\[\\]")) {
+                System.out.println("Found Array " + identifier.split("\\[")[0]);
+                vars.put(identifier.split("\\[")[0], true);
 
+                colTypes.put(identifier.split("\\[")[0],type);
+
+            } else if (type.matches("\\w+<\\w+>")){
+                System.out.println("Found Collection");
+                vars.put(identifier,true);
+
+                colTypes.put(identifier,type.subSequence(type.indexOf("<")+1,type.indexOf(">")).toString());
+            } else {
+                vars.put(identifier,false);
+            }
 
         }
-
-
     }
 
     @Override
     public void enterIn(jJQueryParser.InContext ctx) {
+
+        Boolean isCollection = vars.get(ctx.ID().getSymbol().getText());
+
+        if (isCollection == null) {
+            System.err.println("ERROR: " + ctx.ID().getSymbol().getText() + " is not declared");
+        } else if (!isCollection) {
+            System.err.println("ERROR: " + ctx.ID().getSymbol().getText() + " is not a collection");
+        }
     }
 
     @Override
@@ -127,6 +148,7 @@ public class Translator extends jJQueryParserBaseListener {
     @Override
     public void exitCompilationUnit(jJQueryParser.CompilationUnitContext ctx) {
         System.out.println(vars.toString());
+        System.out.println(colTypes.toString());
     }
 
 }

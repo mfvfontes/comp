@@ -445,6 +445,8 @@ J_PRIME         : '\'';
 IN : 'in';
 OUT : 'out';
 
+L_AND : '&';
+L_OR : '|';
 
 EQ_EXPR : 'eq';
 GT_EXPR : 'gt';

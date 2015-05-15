@@ -6,16 +6,27 @@ options {
 
 jQueryBlock : OPENTAG (in | out | expr | COMMENT_INSIDE)* CLOSETAG;
 
+
 in : IN ID J_SEMI;
 out : OUT ID J_SEMI;
 expr : ID J_ASSIGN selector J_SEMI;
 
-selector : openSelect ID (selector_expr|multiple_expr) ID? closeSelect;
+
+logical_expr    : logical_expr l_op logical_expr
+                | J_LPAREN logical_expr J_RPAREN
+                | selector_expr;
+
+selector : openSelect ID logical_expr ID? closeSelect;
 
 openSelect : J_DOLLAR J_LPAREN J_QUOTE;
 closeSelect : J_QUOTE J_RPAREN;
 
-multiple_expr : selector_expr (J_COMMA selector_expr)+ ;
+left            : logical_expr;
+right           : logical_expr;
+
+
+l_op            : L_AND
+                | L_OR;
 
 selector_expr : all_expr
                 | attr_expr
@@ -35,7 +46,7 @@ gt_expr: J_COLON GT_EXPR J_LPAREN evaluator J_RPAREN ;
 lt_expr: J_COLON LT_EXPR J_LPAREN evaluator J_RPAREN ;
 even_expr: J_COLON EVEN_EXPR J_LPAREN J_RPAREN ;
 odd_expr: J_COLON ODD_EXPR J_LPAREN J_RPAREN ;
-not_expr : J_COLON NOT_EXPR J_LPAREN (selector_expr | multiple_expr) J_RPAREN ;
+not_expr : J_COLON NOT_EXPR J_LPAREN (selector_expr | logical_expr) J_RPAREN ;
 
 attribute : ID;
 evaluator : INTEGER | ID;
