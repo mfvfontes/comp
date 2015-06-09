@@ -12,21 +12,15 @@ out : OUT ID J_SEMI;
 expr : ID J_ASSIGN selector J_SEMI;
 
 
-logical_expr    : logical_expr l_op logical_expr
-                | J_LPAREN logical_expr J_RPAREN
-                | selector_expr;
+logical_expr    : logical_expr L_AND logical_expr   #andOp
+                | logical_expr L_OR logical_expr    #orOP
+                | J_LPAREN logical_expr J_RPAREN    #paren
+                | selector_expr                     #select;
 
 selector : openSelect ID logical_expr ID? closeSelect;
 
 openSelect : J_DOLLAR J_LPAREN J_QUOTE;
 closeSelect : J_QUOTE J_RPAREN;
-
-left            : logical_expr;
-right           : logical_expr;
-
-
-l_op            : L_AND
-                | L_OR;
 
 selector_expr : all_expr
                 | attr_expr
@@ -51,13 +45,13 @@ not_expr : J_COLON NOT_EXPR J_LPAREN (selector_expr | logical_expr) J_RPAREN ;
 attribute : ID;
 evaluator : INTEGER | ID;
 
-op :  ASSIGN
-    | CONTAINS_OP
-    | NOT_CONTAINS_OP
-    | BEGINS_OP
-    | ENDS_OP
-    | INCLUDES_OP
-    | PREFIX_OP
+op :  J_ASSIGN         // =
+    | CONTAINS_OP       // *=
+    | NOT_CONTAINS_OP   // !=
+    | BEGINS_OP         // ^=
+    | ENDS_OP           // $=
+    | INCLUDES_OP       // ~=
+    | PREFIX_OP         // |=
     ;
 
 // starting point for parsing a java file

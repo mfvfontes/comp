@@ -455,7 +455,6 @@ EVEN_EXPR : 'even';
 ODD_EXPR : 'odd';
 NOT_EXPR : 'not';
 
-
 CONTAINS_OP : '*=';         /* attribute includes val */
 NOT_CONTAINS_OP : '!=';     /* does not have attribute with value val */
 BEGINS_OP : '^=';           /* attribute begins with val */

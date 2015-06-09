@@ -1,14 +1,13 @@
-import com.sun.org.apache.xpath.internal.operations.Bool;
+import logicTree.LogicNode;
+import logicTree.LogicTree;
+import logicTree.OpNode;
+import logicTree.SelectorExpression;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.misc.ParseCancellationException;
-import org.antlr.v4.runtime.tree.ErrorNode;
+import org.antlr.v4.runtime.tree.*;
 
-import java.io.OutputStream;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
+import java.lang.Object;
 
 /**
  * Created by João on 11/05/2015.
@@ -18,6 +17,8 @@ public class Translator extends jJQueryParserBaseListener {
     ANTLRErrorListener strategy;
     HashMap<String, Boolean> vars = new HashMap<String, Boolean>();
     HashMap<String, String> colTypes = new HashMap<String, String>();
+
+    boolean aborted = false;
 
     // Where to print to
     private PrintStream out;
@@ -30,24 +31,52 @@ public class Translator extends jJQueryParserBaseListener {
     // State of denial :P
     private boolean neg;
 
-    // Collection of Expressions
-    private ArrayList<Expression> expressions;
+    LogicTree tree;
+    // Stack to build tree
+    Stack<LogicNode> nodes;
+    HashSet<String> attributes;
 
-    public Translator(PrintStream stream, TokenStreamRewriter rewriter, ANTLRErrorListener str) {
+    ArrayList<LogicTree> trees;
+
+    jJQueryParser parser;
+
+    public Translator(PrintStream stream, TokenStreamRewriter rewriter, ANTLRErrorListener str, jJQueryParser parser) {
         out = stream;
         this.rewriter = rewriter;
         strategy = str;
+        this.parser = parser;
+        nodes = new Stack<LogicNode>();
+
+        trees = new ArrayList<LogicTree>();
+        attributes = new HashSet<String>();
+    }
+
+    @Override
+    public void enterClassDeclaration(jJQueryParser.ClassDeclarationContext ctx) {
+        rewriter.replace(ctx.Identifier().getSymbol(),"j"+ctx.Identifier().getText());
     }
 
     @Override
     public void enterJQueryBlock(jJQueryParser.JQueryBlockContext ctx) {
-        Token start = ctx.OPENTAG().getSymbol();
 
-        rewriter.replace(start,"/* start jQuery Block */");
+    }
 
-        Token end = ctx.CLOSETAG().getSymbol();
+    @Override
+    public void exitJQueryBlock(jJQueryParser.JQueryBlockContext ctx) {
 
-        rewriter.replace(end,"/* end jQuery Block */");
+        if (!aborted) {
+            String selectors = "";
+
+            for (LogicTree tree : trees) {
+                selectors += tree.toString() + '\n';
+            }
+
+            rewriter.replace(ctx.getStart(), ctx.getStop(), selectors);
+        }
+
+        aborted = false;
+
+        trees.clear();
     }
 
     @Override
@@ -59,16 +88,15 @@ public class Translator extends jJQueryParserBaseListener {
             String identifier = ctx.variableDeclarators().variableDeclarator(i).variableDeclaratorId().getText();
 
             if (identifier.matches("\\w+\\[\\]")) {
-                System.out.println("Found Array " + identifier.split("\\[")[0]);
                 vars.put(identifier.split("\\[")[0], true);
 
                 colTypes.put(identifier.split("\\[")[0],type);
 
             } else if (type.matches("\\w+<\\w+>")){
-                System.out.println("Found Collection");
                 vars.put(identifier,true);
 
                 colTypes.put(identifier,type.subSequence(type.indexOf("<")+1,type.indexOf(">")).toString());
+
             } else {
                 vars.put(identifier,false);
             }
@@ -82,14 +110,25 @@ public class Translator extends jJQueryParserBaseListener {
         Boolean isCollection = vars.get(ctx.ID().getSymbol().getText());
 
         if (isCollection == null) {
-            System.err.println("ERROR: " + ctx.ID().getSymbol().getText() + " is not declared");
+            printError("Variable " + ctx.ID().getSymbol().getText() + " is not declared", ctx.ID().getSymbol().getLine());
+            aborted = true;
         } else if (!isCollection) {
-            System.err.println("ERROR: " + ctx.ID().getSymbol().getText() + " is not a collection");
+            printError("Variable " + ctx.ID().getSymbol().getText() + " is not a collection", ctx.ID().getSymbol().getLine());
+            aborted = true;
         }
     }
 
     @Override
     public void enterOut(jJQueryParser.OutContext ctx) {
+        Boolean isCollection = vars.get(ctx.ID().getSymbol().getText());
+
+        if (isCollection == null) {
+            printError("Variable " + ctx.ID().getSymbol().getText() + " is not declared", ctx.ID().getSymbol().getLine());
+            aborted = true;
+        } else if (!isCollection) {
+            printError("Variable " + ctx.ID().getSymbol().getText() + " is not a collection", ctx.ID().getSymbol().getLine());
+            aborted = true;
+        }
     }
 
     @Override
@@ -99,30 +138,82 @@ public class Translator extends jJQueryParserBaseListener {
 
         from = ctx.selector().ID(0).getText();
 
+        nodes.clear();
+
     }
 
     @Override
     public void exitExpr(jJQueryParser.ExprContext ctx) {
-        /*
-        if (! expressions.isEmpty())
-        {
-            out.print("if (");
-            printExpressions();
-            out.println(")");
-            out.println(to + ".add(" + from + ".get(i));");
+
+        if (!aborted) {
+            LogicTree tree = new LogicTree(from, to, nodes.pop(), colTypes, new ArrayList<String>(attributes));
+
+            trees.add(tree);
         }
-        out.println("}");
-        */
+
+        attributes.clear();
+    }
+
+
+    @Override
+    public void exitAndOp(jJQueryParser.AndOpContext ctx) {
+        LogicNode right = nodes.pop();
+        LogicNode left = nodes.pop();
+
+        OpNode node = new OpNode(left,right,'&');
+        nodes.push(node);
     }
 
     @Override
-    public void enterSelector(jJQueryParser.SelectorContext ctx) {
-        expressions = new ArrayList<Expression>();
+    public void exitOrOP(jJQueryParser.OrOPContext ctx) {
+        LogicNode right = nodes.pop();
+        LogicNode left = nodes.pop();
+
+        OpNode node = new OpNode(left,right,'|');
+        nodes.push(node);
     }
 
     @Override
-    public void enterClass_expr(jJQueryParser.Class_exprContext ctx) {
-        expressions.add(new Expression(Expression.Type.Class,ctx.ID().getText(), neg, from, to));
+    public void exitAttr_expr(jJQueryParser.Attr_exprContext ctx) {
+        addSelectorExpression(ctx.op().getText(), ctx.attribute().getText() ,SelectorExpression.Type.Attr,ctx.evaluator().getText());
+        attributes.add(ctx.attribute().getText());
+    }
+
+    @Override
+    public void exitClass_expr(jJQueryParser.Class_exprContext ctx) {
+        addSelectorExpression(SelectorExpression.Type.Class,ctx.ID().getText());
+    }
+
+    @Override
+    public void exitEq_expr(jJQueryParser.Eq_exprContext ctx) {
+        addSelectorExpression(SelectorExpression.Type.Eq,ctx.evaluator().getText());
+    }
+
+    @Override
+    public void exitGt_expr(jJQueryParser.Gt_exprContext ctx) {
+        addSelectorExpression(SelectorExpression.Type.Gt,ctx.evaluator().getText());
+    }
+
+    @Override
+    public void exitLt_expr(jJQueryParser.Lt_exprContext ctx) {
+        addSelectorExpression(SelectorExpression.Type.Lt, ctx.evaluator().getText());
+    }
+
+    @Override
+    public void exitEven_expr(jJQueryParser.Even_exprContext ctx) {
+        addSelectorExpression(SelectorExpression.Type.Even, "");
+    }
+
+    @Override
+    public void exitOdd_expr(jJQueryParser.Odd_exprContext ctx) {
+        addSelectorExpression(SelectorExpression.Type.Odd, "");
+    }
+
+    private void addSelectorExpression(SelectorExpression.Type type, String evaluator) {
+        nodes.push(new SelectorExpression(type,evaluator,neg));
+    }
+    private void addSelectorExpression(String op, String attribute, SelectorExpression.Type type, String evaluator) {
+        nodes.push(new SelectorExpression(op, attribute, type,evaluator,neg));
     }
 
     @Override
@@ -135,20 +226,16 @@ public class Translator extends jJQueryParserBaseListener {
         neg = false;
     }
 
-    private void printExpressions()
-    {
-        for (int i = 0; i < expressions.size(); i++) {
-            out.print(expressions.get(i).print());
-            if (i != (expressions.size() - 1))
-                out.print(" && ");
-            out.println();
-        }
-    }
-
     @Override
     public void exitCompilationUnit(jJQueryParser.CompilationUnitContext ctx) {
-        System.out.println(vars.toString());
-        System.out.println(colTypes.toString());
+        out.print(rewriter.getText());
     }
+
+
+    private void printError(String error, int line) {
+        System.err.println("Error in line " + line + ":\t " + error );
+
+    }
+
 
 }

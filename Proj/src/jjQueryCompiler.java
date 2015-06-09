@@ -19,10 +19,10 @@ import java.io.PrintStream;
 public class jjQueryCompiler {
     public static void main(String[] args) throws Exception {
 
-        File inFile = new File("in/" + args[0]);
+        File inFile = new File("src/" + args[0]);
         InputStream stream = new FileInputStream(inFile);
 
-        File outFile = new File("src/" + args[0]);
+        File outFile = new File("src/j" + args[0]);
 
         // create a CharStream that reads from standard input
         ANTLRInputStream input = new ANTLRInputStream(stream);
@@ -41,10 +41,8 @@ public class jjQueryCompiler {
 
         ParseTreeWalker walker = new ParseTreeWalker();
         TokenStreamRewriter rewriter = new TokenStreamRewriter(tokens);
-        walker.walk(new Translator(new PrintStream(outFile), rewriter, lexer.getErrorListenerDispatch()), tree);
+        walker.walk(new Translator(new PrintStream(outFile), rewriter, lexer.getErrorListenerDispatch(),parser), tree);
 
         //System.out.println(rewriter.getText());
-
-
     }
 }

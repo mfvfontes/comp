@@ -1,3 +1,5 @@
+package logicTree;
+
 /**
  * Created by João on 12/05/2015.
  */
